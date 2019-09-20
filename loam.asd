@@ -6,4 +6,4 @@
   :components ((:module "src"
                         :components
                         ((:file "main"))))
-  :description "")
+  :description "A First Game")

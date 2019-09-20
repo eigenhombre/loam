@@ -32,5 +32,5 @@
               (charms:refresh-window charms:*standard-window*)))
       (ch-char "@" (floor (/ width 2)) (floor (/ height 2)))))
 
-(defun main ()
+(defun main (&rest args)
   (write-chars-and-poll))
