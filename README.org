@@ -1,3 +1,26 @@
 * Loam
 
-Where the buffalo ...
+I'm trying to learn how to make [[https://en.wikipedia.org/wiki/Roguelike][Roguelikes]] in Common Lisp. I'm
+slightly following in the footsteps of Steve Losh's impressive [[https://github.com/sjl/silt2/blob/master/silt.lisp][=silt=]],
+though I expect this to veer off in unexpected directions.
+
+Right now I'm mostly figuring out basic Common Lisp and =curses= stuff, without worrying too much about what the game will become.
+
+** Build & Run
+
+It probably only builds and runs on Mac so far. First, set up your Mac
+with SBCL. My notes for that are [[http://johnj.com/lisp-projects.html][here]].
+
+Then,
+#+BEGIN_SRC
+make   # to build
+./loam # to run
+#+END_SRC
+
+Hitting the =q= key quits the game.
+
+** Next Steps
+
+- Tolerate resizes of windows larger than world size
+- Draw a little bit of tooltip text when objects are encountered
+- Start thinking about some simple game play
