@@ -1,7 +1,7 @@
 * Loam
 
 I'm trying to learn how to make [[https://en.wikipedia.org/wiki/Roguelike][Roguelikes]] in Common Lisp. I'm
-slightly following in the footsteps of Steve Losh's impressive [[https://github.com/sjl/silt2/blob/master/silt.lisp][=silt=]],
+slightly following in the footsteps of Steve Losh's impressive [[https://github.com/sjl/silt2/blob/master/silt.lisp][Silt]],
 though I expect this to veer off in unexpected directions.
 
 Right now I'm mostly figuring out basic Common Lisp and =curses= stuff, without worrying too much about what the game will become.
