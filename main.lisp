@@ -1,5 +1,10 @@
 (in-package :loam)
 
+;; A game in progress
+
+;; Many ideas and a few code snippets borrowed from Steve Losh's `silt2`:
+;;    https://github.com/sjl/silt2/blob/master/silt.lisp
+
 ;; To jack in to a curses-supporting REPL, run "slimerepl" from bash,
 ;; then `slime-connect` to `localhost:5555`.
 
@@ -32,64 +37,59 @@
   (declare (ignore ign)))
 
 (defparameter *beings*
-  (loop repeat 10
+  (loop repeat 15
      collect (make-being (random *world-size*)
                          (random *world-size*))))
 
 (defun init-random-number-generator ()
   (setf *random-state* (make-random-state t)))
 
+(defun movdel (w h dx dy)
+  (setf *their-x* (min (1- w) (max 0 (+ dx *their-x*))))
+  (setf *their-y* (min (1- h) (max 0 (+ dy *their-y*)))))
 
-;; (defmacro with-screen-dims (w h &rest body)
-;;   `(multiple-value-bind
-;;          (,w ,h)
-;;        (charms:window-dimensions charms:*standard-window*)
-;;      ,@body))
+(defun dbug (e)
+  (format t "~10,'0d ~5d ~5d ~5d ~%"
+          (ident/id e)
+          (location/x e)
+          (location/y e)
+          (attraction/charge e)))
 
-;; (defun movdel (w h dx dy)
-;;   (setf *their-x* (min (1- w) (max 0 (+ dx *their-x*))))
-;;   (setf *their-y* (min (1- h) (max 0 (+ dy *their-y*)))))
+(defmacro with-screen-dims (w h &body body)
+  `(multiple-value-bind (,w ,h) (get-screen-dims *screen*)
+     ,@body))
 
-;; (defun dbug (e)
-;;   (format t "~10,'0d ~5d ~5d ~5d ~%"
-;;           (ident/id e)
-;;           (location/x e)
-;;           (location/y e)
-;;           (attraction/charge e)))
+(define-system render-entities ((e renderable))
+  (with-screen-dims w h
+    (let ((x (location/x e))
+          (y (location/y e)))
+      (if (and (< x w)
+               (< y h))
+          (write-chr-at *screen* #\# x y)))))
 
-;; (define-system render-entities ((e renderable))
-;;   (with-screen-dims w h
-;;     (let ((x (location/x e))
-;;           (y (location/y e)))
-;;       (if (and (< x w)
-;;                (< y h))
-;;           (charms:write-char-at-point
-;;            charms:*standard-window*
-;;            #\# x y)))))
+(defun dist (e)
+  (max (abs (- (location/x e) *their-x*))
+       (abs (- (location/y e) *their-y*))))
 
-;; (defun dist (e)
-;;   (max (abs (- (location/x e) *their-x*))
-;;        (abs (- (location/y e) *their-y*))))
+(define-system move ((e location attraction))
+  (let* ((sign (if (> (attraction/charge e) 0) -1 1))
+         (dx (cond ((= (location/x e) *their-x*) 0)
+                   ((= (location/x e) 0) 0)
+                   ((= (location/x e) (1- *world-size*)) 0)
+                   ((< (location/x e) *their-x*) sign)
+                   (t (- sign))))
+         (dy (cond ((= (location/y e) *their-y*) 0)
+                   ((= (location/y e) 0) 0)
+                   ((= (location/y e) (1- *world-size*)) 0)
+                   ((< (location/y e) *their-y*) sign)
+                   (t (- sign)))))
+    (setf (location/x e) (+ dx (location/x e)))
+    (setf (location/y e) (+ dy (location/y e)))
+    (when (= (dist e) 1)
+      (setf (attraction/charge e) (- (attraction/charge e))))))
 
-;; (define-system move ((e location attraction))
-;;   (let* ((sign (if (> (attraction/charge e) 0) -1 1))
-;;          (dx (cond ((= (location/x e) *their-x*) 0)
-;;                    ((= (location/x e) 0) 0)
-;;                    ((= (location/x e) (1- *world-size*)) 0)
-;;                    ((< (location/x e) *their-x*) sign)
-;;                    (t (- sign))))
-;;          (dy (cond ((= (location/y e) *their-y*) 0)
-;;                    ((= (location/y e) 0) 0)
-;;                    ((= (location/y e) (1- *world-size*)) 0)
-;;                    ((< (location/y e) *their-y*) sign)
-;;                    (t (- sign)))))
-;;     (setf (location/x e) (+ dx (location/x e)))
-;;     (setf (location/y e) (+ dy (location/y e)))
-;;     (when (= (dist e) 1)
-;;       (setf (attraction/charge e) (- (attraction/charge e))))))
 
-;; (define-system dbg ((e location attraction))
-;;   (dbug e))
+;; TBD: Bring this back into the new framework
 
 ;; (defun draw-world ()
 ;;   (run-render-entities)
@@ -118,7 +118,7 @@
 ;;           (sleep 0.1))))
 
 (defun manage-screen ()
-  (multiple-value-bind (w h) (get-screen-coords *screen*)
+  (multiple-value-bind (w h) (get-screen-dims *screen*)
     (setf *screen-width* (1- w) *screen-height* (1- h)
           *screen-center-x* (floor w 2)
           *screen-center-y* (floor h 2))))
@@ -153,32 +153,40 @@
 (defun wait-key-pressed ()
   (get-key-blocking *screen*))
 
+(defun main-state ()
+  (render
+    (run-render-entities))
+  (sleep 1.5))
+
 (defun start-game ()
   (splash-screen)
-  (wait-key-pressed))
+  (wait-key-pressed)
+  (main-state))
 
 (defun init-screen (really-do-curses?)
-  (format t "init screen ~a~%" really-do-curses?)
   (setf *screen*
         (if really-do-curses?
             (make-curses-screen)
             (make-repl-screen))))
 
 (defmacro with-screen (do-curses &body body)
-  `(progn
-     (init-screen ,do-curses)
-     ,(if do-curses
-          (list* 'charms:with-curses '() body)
-          (list* 'progn body))))
+  `(if ,do-curses
+       (progn
+         (init-screen t)
+         (charms:with-curses ()
+           ,@body))
+       (progn
+         (init-screen nil)
+         ,@body)))
+
+(defun main_ (really-use-curses-p)
+  (init-random-number-generator)
+  (with-screen really-use-curses-p
+    (start-game)))
 
 (defun main (&rest _)
   (declare (ignore _))
-  (init-random-number-generator)
-  (with-screen t
-    (start-game)))
+  (main_ t))
 
 (comment
- (progn
-   (init-random-number-generator)
-   (with-screen nil
-     (start-game))))
+ (main_ nil))

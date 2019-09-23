@@ -2,7 +2,7 @@
 
 (defgeneric write-str-at (self txt x y))
 (defgeneric write-chr-at (self c x y))
-(defgeneric get-screen-coords (self))
+(defgeneric get-screen-dims (self))
 (defgeneric get-key-blocking (self))
 (defgeneric get-key-nonblock (self))
 (defgeneric clear (self))
@@ -13,7 +13,7 @@
 (defclass curses-screenable (screenable) () (:documentation "Curses, foiled again!"))
 
 ;; REPL
-(defmethod get-screen-coords ((s repl-screenable))
+(defmethod get-screen-dims ((s repl-screenable))
   (values 100 100))
 
 (defmethod write-str-at ((s repl-screenable) txt x y)
@@ -23,11 +23,11 @@
   (format t "~d, ~d <- '~a'~%" x y c))
 
 (defmethod get-key-blocking ((s repl-screenable))
-  (format t "CHR(block) #\\.")
+  (format t "CHR(block) #\\.~%")
   #\.)
 
 (defmethod get-key-nonblock ((s repl-screenable))
-  (format t "CHR(non-block) #\\.")
+  (format t "CHR(non-block) #\\.~%")
   #\.)
 
 (defmethod clear ((s repl-screenable))
@@ -37,14 +37,14 @@
   (format t "REFRESH~%"))
 
 ;; Curses
-(defmethod get-screen-coords ((s curses-screenable))
+(defmethod get-screen-dims ((s curses-screenable))
   (charms:window-dimensions charms:*standard-window*))
 
 (defmethod write-str-at ((s curses-screenable) txt x y)
   (charms:write-string-at-point charms:*standard-window* txt x y))
 
 (defmethod write-chr-at ((s curses-screenable) c x y)
-  (error "implement me"))
+  (charms:write-char-at-point charms:*standard-window* c x y))
 
 (defmethod get-key-blocking ((s curses-screenable))
   (charms:disable-non-blocking-mode charms:*standard-window*)
