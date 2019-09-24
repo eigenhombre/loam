@@ -17,10 +17,44 @@ make   # to build
 ./loam # to run
 #+END_SRC
 
+** Playing
+
+Moving:
+#+BEGIN_SRC
+      y k u
+       h.l
+      b j n
+#+END_SRC
+
 Hitting the =q= key quits the game.
+
+It's pretty self-explanatory after that.
+
+** REPL development
+
+=screen.lisp= sets up a CLOS-based screen abstraction implemented both
+with =curses= and with a more REPL-friendly print-only version that
+outputs screen operations for cross-checking behavior prior to running
+with the =curses= version.
+
+Evaluate the commented-out form at the bottom of =main.lisp= to see
+the REPL-only behavior.
+
+To jack into a REPL running in the terminal (i.e. outside of Emacs),
+#+BEGIN_SRC
+rlwrap sbcl --eval "(ql:quickload '(:swank) :silent t)" \
+            --eval "(swank:create-server :port 5555 :dont-close t)"
+#+END_SRC
+then in that REPL run
+#+BEGIN_SRC
+(loop (sleep 1))
+#+END_SRC
+
+Then, in Emacs =slime-connect= to =localhost:5555=. You should be able
+to produce =curses= output from the Emacs REPL then.
 
 ** Next Steps
 
-- Tolerate resizes of windows larger than world size
+- Add random motion to beings
 - Draw a little bit of tooltip text when objects are encountered
 - Start thinking about some simple game play

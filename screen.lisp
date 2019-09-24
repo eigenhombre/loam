@@ -7,10 +7,15 @@
 (defgeneric get-key-nonblock (self))
 (defgeneric clear (self))
 (defgeneric refresh (self))
+(defgeneric set-cursor-visibility (self visibility))
+(defgeneric set-cursor-position (self x y))
 
 (defclass screenable () () (:documentation "A curses-ish screen"))
 (defclass repl-screenable (screenable) () (:documentation "For the REPL!!!"))
 (defclass curses-screenable (screenable) () (:documentation "Curses, foiled again!"))
+
+(defun make-repl-screen () (make-instance 'repl-screenable))
+(defun make-curses-screen () (make-instance 'curses-screenable))
 
 ;; REPL
 (defmethod get-screen-dims ((s repl-screenable))
@@ -23,18 +28,26 @@
   (format t "~d, ~d <- '~a'~%" x y c))
 
 (defmethod get-key-blocking ((s repl-screenable))
-  (format t "CHR(block) #\\.~%")
-  #\.)
+  (let ((ret (rand-nth '(#\. #\. #\. #\. #\. #\. #\q))))
+    (format t "CHR(block) ~a~%" ret)
+    ret))
 
 (defmethod get-key-nonblock ((s repl-screenable))
-  (format t "CHR(non-block) #\\.~%")
-  #\.)
+  (let ((ret (rand-nth '(#\. #\. #\. #\. #\. #\. #\q))))
+    (format t "CHR(non-block) ~a~%" ret)
+    ret))
 
 (defmethod clear ((s repl-screenable))
   (format t "CLS~%"))
 
 (defmethod refresh ((s repl-screenable))
   (format t "REFRESH~%"))
+
+(defmethod set-cursor-visibility ((s repl-screenable) visibility)
+  (format t "CURS-SET ~a~%" visibility))
+
+(defmethod set-cursor-position ((s repl-screenable) x y)
+  (format t "CURS-MOV ~a, ~a~%" x y))
 
 ;; Curses
 (defmethod get-screen-dims ((s curses-screenable))
@@ -48,10 +61,11 @@
 
 (defmethod get-key-blocking ((s curses-screenable))
   (charms:disable-non-blocking-mode charms:*standard-window*)
-  (charms:get-char charms:*standard-window*))
+  (charms:get-char charms:*standard-window*)
+  (charms:enable-non-blocking-mode charms:*standard-window*))
 
 (defmethod get-key-nonblock ((s curses-screenable))
-  (error "implement me"))
+  (charms:get-char charms:*standard-window* :ignore-error t))
 
 (defmethod clear ((s curses-screenable))
   (charms:clear-window charms:*standard-window*))
@@ -59,5 +73,8 @@
 (defmethod refresh ((s curses-screenable))
   (charms:refresh-window charms:*standard-window*))
 
-(defun make-repl-screen () (make-instance 'repl-screenable))
-(defun make-curses-screen () (make-instance 'curses-screenable))
+(defmethod set-cursor-visibility ((s curses-screenable) visibility)
+  (charms/ll:curs-set visibility))
+
+(defmethod set-cursor-position ((s curses-screenable) x y)
+  (charms:move-cursor charms:*standard-window* x y))

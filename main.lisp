@@ -36,17 +36,25 @@
 (defmacro comment (&rest ign)
   (declare (ignore ign)))
 
-(defparameter *beings*
-  (loop repeat 15
-     collect (make-being (random *world-size*)
-                         (random *world-size*))))
+(defvar *beings*)
+
+(defun init-beings (num-beings w h)
+  (setf *beings*
+        (loop repeat num-beings
+           collect (make-being (random w)
+                               (random h)))))
 
 (defun init-random-number-generator ()
   (setf *random-state* (make-random-state t)))
 
+(defun clamp (mn x mx)
+  (cond ((< x mn) mn)
+        ((> x mx) mx)
+        (t x)))
+
 (defun movdel (w h dx dy)
-  (setf *their-x* (min (1- w) (max 0 (+ dx *their-x*))))
-  (setf *their-y* (min (1- h) (max 0 (+ dy *their-y*)))))
+  (setf *their-x* (clamp 0 (+ dx *their-x*) (1- w)))
+  (setf *their-y* (clamp 0 (+ dy *their-y*) (1- h))))
 
 (defun dbug (e)
   (format t "~10,'0d ~5d ~5d ~5d ~%"
@@ -71,51 +79,31 @@
   (max (abs (- (location/x e) *their-x*))
        (abs (- (location/y e) *their-y*))))
 
-(define-system move ((e location attraction))
-  (let* ((sign (if (> (attraction/charge e) 0) -1 1))
-         (dx (cond ((= (location/x e) *their-x*) 0)
-                   ((= (location/x e) 0) 0)
-                   ((= (location/x e) (1- *world-size*)) 0)
-                   ((< (location/x e) *their-x*) sign)
+(defun dxdy (charge x y w h)
+  (let* ((sign (if (> charge 0) -1 1))
+         (dx (cond ((= x *their-x*) 0)
+                   ((= x 0) 0)
+                   ((= x (1- w)) 0)
+                   ((< x *their-x*) sign)
                    (t (- sign))))
-         (dy (cond ((= (location/y e) *their-y*) 0)
-                   ((= (location/y e) 0) 0)
-                   ((= (location/y e) (1- *world-size*)) 0)
-                   ((< (location/y e) *their-y*) sign)
+         (dy (cond ((= y *their-y*) 0)
+                   ((= y 0) 0)
+                   ((= y (1- h)) 0)
+                   ((< y *their-y*) sign)
                    (t (- sign)))))
-    (setf (location/x e) (+ dx (location/x e)))
-    (setf (location/y e) (+ dy (location/y e)))
-    (when (= (dist e) 1)
-      (setf (attraction/charge e) (- (attraction/charge e))))))
+    (values (rand-nth `(,dx ,dx ,dx 0 1 -1))
+            (rand-nth `(,dy ,dy ,dy 0 1 -1)))))
 
-
-;; TBD: Bring this back into the new framework
-
-;; (defun draw-world ()
-;;   (run-render-entities)
-;;   (charms:write-char-at-point charms:*standard-window*
-;;                               #\@
-;;                               *their-x*
-;;                               *their-y*)
-;;   (charms/ll:curs-set 0))
-
-;; (defun poll-till-done ()
-;;   (loop named poll-kbd
-;;      do (progn
-;;           (run-move)
-;;           (draw-world)
-;;           (with-screen-dims w h
-;;             (case (charms:get-char charms:*standard-window*)
-;;               (#\q (return-from poll-kbd))
-;;               (#\h (movdel w h -1 0))
-;;               (#\l (movdel w h 1 0))
-;;               (#\k (movdel w h 0 -1))
-;;               (#\j (movdel w h 0 1))
-;;               (#\y (movdel w h -1 -1))
-;;               (#\b (movdel w h -1 1))
-;;               (#\u (movdel w h 1 -1))
-;;               (#\n (movdel w h 1 1))))
-;;           (sleep 0.1))))
+(define-system move ((e location attraction))
+  (multiple-value-bind (w h) (get-screen-dims *screen*)
+    (multiple-value-bind (dx dy) (dxdy (attraction/charge e)
+                                       (location/x e)
+                                       (location/y e)
+                                       w h)
+      (setf (location/x e) (clamp 0 (+ dx (location/x e)) w))
+      (setf (location/y e) (clamp 0 (+ dy (location/y e)) h))
+      (when (= (dist e) 1)
+        (setf (attraction/charge e) (- (attraction/charge e)))))))
 
 (defun manage-screen ()
   (multiple-value-bind (w h) (get-screen-dims *screen*)
@@ -143,11 +131,12 @@
   (render
     (write-centered '("L O A M"
                       "(apologies to Steve Losh)"
-                      "Press any key to start...")
+                      "Press any key to start....")
                     *screen-center-x*
                     (1- *screen-center-y*))))
 
 (defun splash-screen ()
+  (set-cursor-visibility *screen* 0)
   (render-title))
 
 (defun wait-key-pressed ()
@@ -155,11 +144,34 @@
 
 (defun main-state ()
   (render
-    (run-render-entities))
-  (sleep 1.5))
+    (run-render-entities)
+    (write-chr-at *screen* #\@ *their-x* *their-y*)
+    (set-cursor-position *screen* *their-x* *their-y*))
+  (loop named joe
+     do (let ((kp (get-key-nonblock *screen*)))
+          (with-screen-dims w h
+            (case kp
+              (#\q (return-from joe))
+              (#\h (movdel w h -1 0))
+              (#\l (movdel w h 1 0))
+              (#\k (movdel w h 0 -1))
+              (#\j (movdel w h 0 1))
+              (#\y (movdel w h -1 -1))
+              (#\b (movdel w h -1 1))
+              (#\u (movdel w h 1 -1))
+              (#\n (movdel w h 1 1))))
+          (run-move)
+          (render
+            (run-render-entities)
+            (write-chr-at *screen* #\@ *their-x* *their-y*)
+            (set-cursor-position *screen* *their-x* *their-y*))
+          (sleep 0.01))
+     finally
+       (return-from joe)))
 
 (defun start-game ()
   (splash-screen)
+  (set-cursor-visibility *screen* 2)
   (wait-key-pressed)
   (main-state))
 
@@ -179,14 +191,17 @@
          (init-screen nil)
          ,@body)))
 
-(defun main_ (really-use-curses-p)
+(defun main_ (really-do-curses? num-beings)
   (init-random-number-generator)
-  (with-screen really-use-curses-p
-    (start-game)))
+  (with-screen really-do-curses?
+    (with-screen-dims w h
+      (init-beings num-beings w h))
+    (start-game))
+  (format t "Thanks for playing.~%"))
 
 (defun main (&rest _)
   (declare (ignore _))
-  (main_ t))
+  (main_ t 100))
 
-(comment
- (main_ nil))
+(comment (main_ nil 10))
+
